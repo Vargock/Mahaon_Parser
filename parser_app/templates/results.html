@@ -24,34 +24,31 @@
       </div>
 
       <!-- Parsing Status -->
-      {% if parsing_status %}
-      <div
-        class="parsing-message {{ 'parsing-in-progress' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'parsing-error' if parsing_status == 'error' or parsing_status == 'canceled' else 'parsing-success' }}"
-      >
-        <span
-          class="loader"
-          style="display: {{ 'block' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'none' }};"
-        ></span>
-        <p>
-          {% if parsing_status == 'in_progress' %}
-            Parsing in progress...
-          {% elif parsing_status == 'awaiting_confirmation' %}
-            Awaiting confirmation for large parse. <a href="{{ url_for('confirm_parse') }}">Confirm or Cancel</a>
-          {% elif parsing_status == 'error' %}
-            Parsing failed. Check logs below.
-          {% elif parsing_status == 'canceled' %}
-            Parsing was canceled.
-          {% else %}
-            Parsing completed successfully.
-          {% endif %}
-        </p>
-        {% if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' %}
-        <form action="{{ url_for('cancel_parse') }}" method="POST">
-          <button type="submit" class="btn">Cancel Parsing</button>
-        </form>
-        {% endif %}
+      <div id="parsing-status-container">
+        <!-- Initial status render from server -->
+        <div
+          class="parsing-message {{ 'parsing-in-progress' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'parsing-error' if parsing_status == 'error' or parsing_status == 'canceled' else 'parsing-success' }}"
+          id="parsing-status-message"
+        >
+          <span class="loader" id="parsing-loader"
+            style="display: {{ 'block' if parsing_status in ['in_progress', 'awaiting_confirmation'] else 'none' }};"
+          ></span>
+          <p id="parsing-status-text">
+            {% if parsing_status == 'in_progress' %}
+              Parsing in progress...
+            {% elif parsing_status == 'awaiting_confirmation' %}
+              Awaiting confirmation for large parse. <a href="{{ url_for('confirm_parse') }}">Confirm or Cancel</a>
+            {% elif parsing_status == 'error' %}
+              Parsing failed. Check logs below.
+            {% elif parsing_status == 'canceled' %}
+              Parsing was canceled.
+            {% else %}
+              Parsing completed successfully.
+            {% endif %}
+          </p>
+        </div>
       </div>
-      {% endif %}
+
 
       <!-- Category Filter -->
       <div class="form-group">
@@ -102,9 +99,11 @@
       {% if logs %}
       <div class="logs">
         <h2>Parsing Logs</h2>
-        {% for log in logs %}
-        <p>{{ log }}</p>
-        {% endfor %}
+        <div id="log-output">
+          {% for log in logs %}
+          <p>{{ log }}</p>
+          {% endfor %}
+        </div>
       </div>
       {% endif %}
 
@@ -188,5 +187,56 @@
       <p>No variants found.</p>
       {% endif %}
     </div>
+
+  <script>
+    function updateLogs() {
+      fetch("/logs")
+        .then((res) => res.json())
+        .then((logs) => {
+          const logContainer = document.getElementById("log-output");
+          logContainer.innerHTML = logs.map(log => `<p>${log}</p>`).join("");
+        });
+    }
+
+    function updateParsingStatus() {
+        fetch("/parsing-status")
+          .then((res) => res.json())
+          .then((data) => {
+            const status = data.status;
+            const container = document.getElementById("parsing-status-message");
+            const text = document.getElementById("parsing-status-text");
+            const loader = document.getElementById("parsing-loader");
+
+            container.className = "parsing-message";
+            if (status === "in_progress" || status === "awaiting_confirmation") {
+              container.classList.add("parsing-in-progress");
+              loader.style.display = "block";
+            } else if (status === "error" || status === "canceled") {
+              container.classList.add("parsing-error");
+              loader.style.display = "none";
+            } else {
+              container.classList.add("parsing-success");
+              loader.style.display = "none";
+            }
+
+            // Update text
+            if (status === "in_progress") {
+              text.innerHTML = "Parsing in progress...";
+            } else if (status === "awaiting_confirmation") {
+              text.innerHTML =
+                'Awaiting confirmation for large parse. <a href="{{ url_for("confirm_parse") }}">Confirm or Cancel</a>';
+            } else if (status === "error") {
+              text.innerText = "Parsing failed. Check logs below.";
+            } else if (status === "canceled") {
+              text.innerText = "Parsing was canceled.";
+            } else {
+              text.innerText = "Parsing completed successfully.";
+            }
+          });
+      }
+
+    setInterval(updateParsingStatus, 1500);
+    setInterval(updateLogs, 1500);
+  </script>
   </body>
 </html>

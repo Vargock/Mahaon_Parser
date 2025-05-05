@@ -1,6 +1,5 @@
 import os
 import logging
-from datetime import datetime
 from flask import (
     Flask,
     render_template,
@@ -19,7 +18,7 @@ import openpyxl
 from io import StringIO, BytesIO
 
 
-## Pythom Modules
+## Python Modules
 from .modules.db_write import (
     create_db,
     cleanup_incomplete,
@@ -38,6 +37,7 @@ from .modules.utilities import (
 )
 
 
+create_db()
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 IMAGES_FOLDER = os.path.join(app.static_folder, "images")
@@ -96,7 +96,7 @@ def favicon():
     if os.path.exists(favicon_path):
         return send_from_directory(app.static_folder, "favicon.ico")
     else:
-        log_message(None, "favicon.ico not found in static folder", level="warnin")
+        log_message(None, "favicon.ico not found in static folder", level="warning")
         return Response(status=404)
 
 
@@ -113,49 +113,49 @@ def parse():
         int(max_products) if max_products and max_products.isdigit() else None
     )
 
-    parse_session_id = str(uuid.uuid4())
-    session["parse_session_id"] = parse_session_id
+    session_id = str(uuid.uuid4())
+
+    session["parse_session_id"] = session_id
+
     update_session_status(
-        parse_session_id,
+        session_id,
         "in_progress",
         progress="collecting_urls",
         category_name=category_name,
     )
-    CANCEL_FLAGS[parse_session_id] = False
+    CANCEL_FLAGS[session_id] = False
 
-    def run_parse(parse_session_id, category_name):
+    log_message(
+        session_id,
+        f"URL: {url}, category_url: {category_url}, category_name:'{category_name}'",
+        level="debug",
+    )
+
+    def run_parse(session_id, category_name):
         try:
             parse_catalog(
                 catalog_url=category_url or None,
                 category=category_name or None,
                 max_pages=max_pages,
                 max_products=max_products,
-                session_id=parse_session_id,
+                session_id=session_id,
                 url=url or None,
                 cancel_flags=CANCEL_FLAGS,
             )
-            if not CANCEL_FLAGS.get(parse_session_id, False):
-                status, _, _ = get_session_status(parse_session_id)
-                if status != "awaiting_confirmation":
-                    update_session_status(parse_session_id, "complete")
-                    log_message(
-                        parse_session_id, "✅ Парсинг завершен успешно.", level="info"
-                    )
+
         except Exception as e:
-            log_message(
-                parse_session_id, f"❌ Ошибка во время парсинга: {e}", level="error"
-            )
-            update_session_status(parse_session_id, "error")
-            cleanup_incomplete(parse_session_id)
+            log_message(session_id, f"❌ Ошибка во время парсинга: {e}", level="error")
+            update_session_status(session_id, "error")
+            cleanup_incomplete(session_id)
         finally:
-            CANCEL_FLAGS.pop(parse_session_id, None)
+            CANCEL_FLAGS.pop(session_id, None)
 
     log_message(
-        parse_session_id,
-        f"Starting parsing thread for session {parse_session_id} (URL: {url}, Category: {category_name})",
+        session_id,
+        f"Starting parsing thread for session {session_id} (URL: {url}, Category: {category_name})",
         level="debug",
     )
-    threading.Thread(target=run_parse, args=(parse_session_id, category_name)).start()
+    threading.Thread(target=run_parse, args=(session_id, category_name)).start()
     return redirect(url_for("results"))
 
 
@@ -230,6 +230,13 @@ def confirm_parse():
             CANCEL_FLAGS.pop(parse_session_id, None)
             return redirect(url_for("results"))
 
+    log_message(None, f"Function confirm_parse(), {product_urls}", level="debug")
+    if len(product_urls):
+        log_message(
+            None, f"Function confirm_parse(), {len(product_urls)}", level="debug"
+        )
+    else:
+        logging.error(f"len({product_urls})")
     return render_template(
         "confirm.html",
         product_count=len(product_urls),
@@ -274,7 +281,7 @@ def status(session_id):
     if selected_category and selected_category != "all":
         cursor.execute(
             "SELECT * FROM products WHERE category = ? AND is_complete = 1",
-            (selected_category,),
+            (selected_category),
         )
     else:
         cursor.execute("SELECT * FROM products WHERE is_complete = 1")
@@ -318,12 +325,15 @@ def status(session_id):
 @app.route("/results")
 def results():
     parse_session_id = session.get("parse_session_id", None)
+
     status, _, _ = (
         get_session_status(parse_session_id)
         if parse_session_id
         else ("complete", [], None)
     )
+
     selected_category = request.args.get("category", None)
+
     if not selected_category and parse_session_id:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -334,6 +344,7 @@ def results():
         result = cursor.fetchone()
         selected_category = result[0] if result else None
         conn.close()
+
     export_type = request.args.get("export", None)
     export_table = request.args.get("table", None)
 
@@ -405,6 +416,24 @@ def results():
         selected_category=selected_category,
         parse_session_id=parse_session_id,
     )
+
+
+@app.route("/logs")
+def get_latest_logs():
+    parse_session_id = session.get("parse_session_id")
+    logs = get_logs(parse_session_id) if parse_session_id else []
+    return jsonify(logs)
+
+
+@app.route("/parsing-status")
+def get_parsing_status():
+    parse_session_id = session.get("parse_session_id")
+    status, _, _ = (
+        get_session_status(parse_session_id)
+        if parse_session_id
+        else ("complete", [], None)
+    )
+    return jsonify({"status": status})
 
 
 @app.route("/browse")

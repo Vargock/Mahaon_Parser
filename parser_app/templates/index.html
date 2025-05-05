@@ -1,40 +1,67 @@
+<!-- Declare the document type and HTML version -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- Specify character encoding for proper text rendering -->
     <meta charset="UTF-8" />
+
+    <!-- Make the page responsive on all devices -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Set the title of the page, shown in the browser tab -->
     <title>Parse Alize Catalog</title>
+
+    <!-- Import Roboto font from Google Fonts (weights 400, 500, 700) -->
     <link
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Link to the app's custom CSS file, served from Flask static folder -->
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
     />
+
+    <!-- Set favicon icon for browser tab, also from Flask static folder -->
     <link
       rel="icon"
       type="image/x-icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
   </head>
+
   <body>
+    <!-- Main container for layout structure -->
     <div class="container">
+      <!-- Page header -->
       <h1>Parse Alize Catalog</h1>
+
+      <!-- Navigation buttons group -->
       <div class="button-group">
+        <!-- Link to view parsing results -->
         <a href="{{ url_for('results') }}" class="btn">View Results</a>
+        <!-- Link to browse the product catalog -->
         <a href="{{ url_for('browse') }}" class="btn">Browse Products</a>
       </div>
 
-      <!-- Parsing Status -->
+      <!-- CONDITIONAL BLOCK: Show parsing status if it exists -->
       {% if parsing_status %}
       <div
-        class="parsing-message {{ 'parsing-in-progress' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'parsing-error' if parsing_status == 'error' or parsing_status == 'canceled' else 'parsing-success' }}"
+        class="parsing-message 
+          {{ 
+            'parsing-in-progress' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation'
+            else 'parsing-error' if parsing_status == 'error' or parsing_status == 'canceled'
+            else 'parsing-success'
+          }}"
       >
+        <!-- Loader animation, visible only if parsing is in progress or awaiting confirmation -->
         <span
           class="loader"
           style="display: {{ 'block' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'none' }};"
         ></span>
+
+        <!-- Conditional status message block -->
         <p>
           {% if parsing_status == 'in_progress' %} Parsing in progress... {%
           elif parsing_status == 'awaiting_confirmation' %} Awaiting
@@ -44,6 +71,8 @@
           Results. {% elif parsing_status == 'canceled' %} Parsing was canceled.
           {% else %} Parsing completed successfully. {% endif %}
         </p>
+
+        <!-- Cancel form, only visible while parsing or waiting for confirmation -->
         {% if parsing_status == 'in_progress' or parsing_status ==
         'awaiting_confirmation' %}
         <form action="{{ url_for('cancel_parse') }}" method="POST">
@@ -53,7 +82,9 @@
       </div>
       {% endif %}
 
+      <!-- MAIN PARSING FORM -->
       <form action="{{ url_for('parse') }}" method="POST" class="parse-form">
+        <!-- Optional: user can paste a full product or category URL directly -->
         <div class="form-group">
           <label for="url">Product or Category URL (optional):</label>
           <input
@@ -63,18 +94,25 @@
             placeholder="e.g., https://nsk-mahaon.ru/products/..."
           />
         </div>
+
+        <!-- User selects a category to parse from dropdown -->
         <div class="form-group">
           <label for="category">Select Category:</label>
           <select id="category" name="category">
             <option value="">Select a category</option>
+            <!-- Dynamically populate categories from Flask context -->
             {% for category in categories %}
             <option value="{{ category.url }}" data-name="{{ category.name }}">
               {{ category.name }}
             </option>
             {% endfor %}
           </select>
+
+          <!-- Hidden input: stores category name (for backend use) -->
           <input type="hidden" id="category_name" name="category_name" />
         </div>
+
+        <!-- Optional limit on how many pages to parse -->
         <div class="form-group">
           <label for="max_pages">Max Pages (optional):</label>
           <input
@@ -85,6 +123,8 @@
             placeholder="e.g., 5"
           />
         </div>
+
+        <!-- Optional limit on how many products to parse -->
         <div class="form-group">
           <label for="max_products">Max Products (optional):</label>
           <input
@@ -95,11 +135,16 @@
             placeholder="e.g., 10"
           />
         </div>
+
+        <!-- Submit button: starts the parsing process -->
         <button type="submit" class="btn">Start Parsing</button>
       </form>
     </div>
 
+    <!-- JAVASCRIPT SECTION -->
     <script>
+      // When user selects a category from dropdown,
+      // store its human-readable name in the hidden input
       document
         .getElementById("category")
         .addEventListener("change", function () {

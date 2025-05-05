@@ -16,7 +16,7 @@ def parse_catalog(
 ):
     log_message(
         session_id,
-        f"Начало парсинга: URL={url}, Категория={category}, Каталог={catalog_url}",
+        f"Начало парсинга: URL={url}, Категория={category}, Каталог={catalog_url}, Макс. Страниц={max_pages}, Макс. Товаров={max_products}",
         level="debug",
     )
     update_session_status(session_id, "in_progress", progress="collecting_urls")
@@ -82,19 +82,19 @@ def parse_catalog(
                 f"Found {len(product_urls, level="debug")} product URLs in catalog",
                 level="info",
             )
-            if len(product_urls) > 5:
-                update_session_status(
-                    session_id,
-                    "awaiting_confirmation",
-                    product_urls,
-                    "awaiting_confirmation",
-                )
-                log_message(
-                    session_id,
-                    f"🛑 Найдено {len(product_urls)} продуктов, требуется подтверждение",
-                    level="warning",
-                )
-                return
+            # if len(product_urls) > 5:
+            #     update_session_status(
+            #         session_id,
+            #         "awaiting_confirmation",
+            #         product_urls,
+            #         "awaiting_confirmation",
+            #     )
+            #     log_message(
+            #         session_id,
+            #         f"🛑 Найдено {len(product_urls)} продуктов, требуется подтверждение",
+            #         level="warning",
+            #     )
+            #     return
             parse_product_urls(product_urls, category, session_id, cancel_flags)
         else:
             # Parse all categories

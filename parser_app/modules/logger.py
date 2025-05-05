@@ -1,6 +1,6 @@
 import logging
 import os
-import sqlite3
+
 import datetime
 
 # Import modules
@@ -42,7 +42,9 @@ def get_logger(session_id=None):
         handler = logging.FileHandler(f"logs/{logger_name}.log", encoding="utf-8")
 
         # Define the log message format
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        formatter = logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(filename)s - Line %(lineno)d - %(funcName)s: %(message)s"
+        )
 
         # Set the format for the log handler
         handler.setFormatter(formatter)
@@ -73,6 +75,17 @@ def save_log(session_id: str, message: str):
     # Connect to the SQLite database
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # Check if the session_id exists in the sessions table
+    try:
+        cursor.execute(
+            "SELECT 1 FROM parse_sessions WHERE session_id = ?", (session_id,)
+        )
+    except Exception as e:
+        log_message(session_id, f"Error logging: {e}", level="error")
+    if cursor.fetchone() is None:
+        # Handle the error or log a warning (you could raise an exception or handle it as needed)
+        raise ValueError(f"Session ID {session_id} does not exist.")
 
     # Insert the log message into the database
     cursor.execute(

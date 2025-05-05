@@ -7,6 +7,7 @@ import sqlite3
 def get_db_connection():
     conn = sqlite3.connect("products.db")
     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode=WAL;")  # Enable WAL mode for better concurrency
     return conn
 
 

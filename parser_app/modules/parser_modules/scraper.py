@@ -182,16 +182,30 @@ def scrape_catalog_page(
                     )
                     if product_url not in product_urls:
                         product_urls.append(product_url)
+                        log_message(
+                            session_id, f"Проверка длины {product_urls}", level="debug"
+                        )
                         if (
                             max_products is not None
                             and len(product_urls) >= max_products
                         ):
                             log_message(
                                 session_id,
+                                f"Длина составляет {len(product_urls)}",
+                                level="debug",
+                            )
+                            log_message(
+                                session_id,
                                 f"Достигнут лимит продуктов ({max_products}). Прекращение парсинга.",
                                 level="info",
                             )
                             return product_urls
+                        else:
+                            log_message(
+                                session_id,
+                                f"Проблема с product_urls, function scrape_catalog_page {product_urls}",
+                                level="debug",
+                            )
                 else:
                     log_message(
                         session_id,

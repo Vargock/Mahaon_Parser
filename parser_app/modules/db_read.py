@@ -1,5 +1,6 @@
-from .utilities import get_db_connection
 import json
+
+from .utilities import get_db_connection
 
 
 def get_session_status(session_id):
