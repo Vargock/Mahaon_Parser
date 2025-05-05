@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parse Alize Catalog</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Parse Alize Catalog</h1>
+      <div class="button-group">
+        <a href="{{ url_for('results') }}" class="btn">View Results</a>
+        <a href="{{ url_for('browse') }}" class="btn">Browse Products</a>
+      </div>
+
+      <!-- Parsing Status -->
+      {% if parsing_status %}
+      <div
+        class="parsing-message {{ 'parsing-in-progress' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'parsing-error' if parsing_status == 'error' or parsing_status == 'canceled' else 'parsing-success' }}"
+      >
+        <span
+          class="loader"
+          style="display: {{ 'block' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'none' }};"
+        ></span>
+        <p>
+          {% if parsing_status == 'in_progress' %} Parsing in progress... {%
+          elif parsing_status == 'awaiting_confirmation' %} Awaiting
+          confirmation for large parse.
+          <a href="{{ url_for('confirm_parse') }}">Confirm or Cancel</a>
+          {% elif parsing_status == 'error' %} Parsing failed. Check logs in
+          Results. {% elif parsing_status == 'canceled' %} Parsing was canceled.
+          {% else %} Parsing completed successfully. {% endif %}
+        </p>
+        {% if parsing_status == 'in_progress' or parsing_status ==
+        'awaiting_confirmation' %}
+        <form action="{{ url_for('cancel_parse') }}" method="POST">
+          <button type="submit" class="btn">Cancel Parsing</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <form action="{{ url_for('parse') }}" method="POST" class="parse-form">
+        <div class="form-group">
+          <label for="url">Product or Category URL (optional):</label>
+          <input
+            type="text"
+            id="url"
+            name="url"
+            placeholder="e.g., https://nsk-mahaon.ru/products/..."
+          />
+        </div>
+        <div class="form-group">
+          <label for="category">Select Category:</label>
+          <select id="category" name="category">
+            <option value="">Select a category</option>
+            {% for category in categories %}
+            <option value="{{ category.url }}" data-name="{{ category.name }}">
+              {{ category.name }}
+            </option>
+            {% endfor %}
+          </select>
+          <input type="hidden" id="category_name" name="category_name" />
+        </div>
+        <div class="form-group">
+          <label for="max_pages">Max Pages (optional):</label>
+          <input
+            type="number"
+            id="max_pages"
+            name="max_pages"
+            min="1"
+            placeholder="e.g., 5"
+          />
+        </div>
+        <div class="form-group">
+          <label for="max_products">Max Products (optional):</label>
+          <input
+            type="number"
+            id="max_products"
+            name="max_products"
+            min="1"
+            placeholder="e.g., 10"
+          />
+        </div>
+        <button type="submit" class="btn">Start Parsing</button>
+      </form>
+    </div>
+
+    <script>
+      document
+        .getElementById("category")
+        .addEventListener("change", function () {
+          const selectedOption = this.options[this.selectedIndex];
+          const categoryName = selectedOption.getAttribute("data-name") || "";
+          document.getElementById("category_name").value = categoryName;
+        });
+    </script>
+  </body>
+</html>

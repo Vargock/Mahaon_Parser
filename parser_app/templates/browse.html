@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Products</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Browse Products</h1>
+        <div class="button-group">
+            <a href="{{ url_for('index') }}" class="btn">Back to Home</a>
+            <a href="{{ url_for('results') }}" class="btn">View Parsing Results</a>
+        </div>
+
+        <!-- Parsing Status -->
+        {% if parsing_status %}
+        <div
+            class="parsing-message {{ 'parsing-in-progress' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'parsing-error' if parsing_status == 'error' or parsing_status == 'canceled' else 'parsing-success' }}"
+        >
+            <span
+                class="loader"
+                style="display: {{ 'block' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'none' }};"
+            ></span>
+            <p>
+                {% if parsing_status == 'in_progress' %}
+                    Parsing in progress...
+                {% elif parsing_status == 'awaiting_confirmation' %}
+                    Awaiting confirmation for large parse. <a href="{{ url_for('confirm_parse') }}">Confirm or Cancel</a>
+                {% elif parsing_status == 'error' %}
+                    Parsing failed. Check logs in Results.
+                {% elif parsing_status == 'canceled' %}
+                    Parsing was canceled.
+                {% else %}
+                    Parsing completed successfully.
+                {% endif %}
+            </p>
+            {% if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' %}
+            <form action="{{ url_for('cancel_parse') }}" method="POST">
+                <button type="submit" class="btn">Cancel Parsing</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="category-filter">Filter by Category:</label>
+            <select id="category-filter" onchange="filterCategory()">
+                <option value="all" {% if selected_category == 'all' or not selected_category %}selected{% endif %}>All Categories</option>
+                {% for category in categories %}
+                    <option value="{{ category }}" {% if selected_category == category %}selected{% endif %}>{{ category }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="product-grid">
+            {% for data in products %}
+                {% set product = data.product %}
+                <div class="product-card" data-product='{{ data | tojson | safe }}'>
+                    {% if product[8] and product[8]|length > 0 %}
+                     <img class="main-image" src="{{ url_for('static', filename=(product[8] | replace('static/', '')) | replace('\\', '/')) }}" alt="{{ product[2] }}" loading="lazy">
+                    {% else %}
+                        <div class="no-image">No Image Available</div>
+                    {% endif %}
+                    <div class="product-card-content">
+                        <h3>{{ product[2] }}</h3>
+                        <p>Category: {{ product[1] }}</p>
+                        <button class="btn view-details">View Details</button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="modal" id="product-modal">
+            <div class="modal-content">
+                <span class="close">×</span>
+                <h2 id="modal-title"></h2>
+                <img id="modal-image" class="main-image" src="" alt="Product Image">
+                <p><strong>Category:</strong> <span id="modal-category"></span></p>
+                <p><strong>Price:</strong> <span id="modal-price"></span></p>
+                <p><strong>Состав:</strong> <span id="modal-sostav"></span></p>
+                <p><strong>Вес мотка:</strong> <span id="modal-ves-motka"></span></p>
+                <p><strong>Длина мотка:</strong> <span id="modal-dlina-motka"></span></p>
+                <p><strong>Вес упаковки:</strong> <span id="modal-ves-upakovki"></span></p>
+                <p><strong>URL:</strong> <a id="modal-url" href="" target="_blank"></a></p>
+                <p><strong>Last Updated:</strong> <span id="modal-last-updated"></span></p>
+                <h3>Variants</h3>
+                <div class="variants" id="modal-variants"></div>
+            </div>
+        </div>
+
+        <div id="zoom-modal" class="modal">
+            <div class="zoom-modal-content">
+                <span class="close">×</span>
+                <img id="zoom-image" src="" alt="Zoomed Image">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.querySelectorAll('.view-details').forEach(button => {
+            button.addEventListener('click', () => {
+                try {
+                    const card = button.closest('.product-card');
+                    if (!card || !card.dataset.product) {
+                        console.error('Product card or data-product not found');
+                        alert('Error: Product data not found.');
+                        return;
+                    }
+
+                    let data;
+                    try {
+                        data = JSON.parse(card.dataset.product);
+                    } catch (e) {
+                        console.error('Failed to parse product data:', e);
+                        alert('Error: Invalid product data.');
+                        return;
+                    }
+
+                    if (!data.product || !data.variants) {
+                        console.error('Invalid data structure:', data);
+                        alert('Error: Invalid product structure.');
+                        return;
+                    }
+
+                    const product = data.product;
+                    let variants = data.variants;
+
+                    variants = variants.sort((a, b) => {
+                        const aStr = a[2];
+                        const bStr = b[2];
+                        const aNum = /^\d*\.?\d*$/.test(aStr) ? parseFloat(aStr) : null;
+                        const bNum = /^\d*\.?\d*$/.test(bStr) ? parseFloat(bStr) : null;
+                        if (aNum !== null && bNum !== null) {
+                            return aNum - bNum;
+                        }
+                        return aStr.localeCompare(bStr);
+                    });
+
+                    console.log('Product:', product);
+                    console.log('Variants:', variants);
+                    console.log('Variant article_numbers (sorted):', variants.map(v => v[2]));
+
+                    document.getElementById('modal-title').textContent = product[2] || 'Не найдено';
+                    document.getElementById('modal-category').textContent = product[1] || 'Не найдено';
+                    document.getElementById('modal-price').textContent = product[3] || 'Не найдено';
+                    document.getElementById('modal-sostav').textContent = product[4] || 'Не найдено';
+                    document.getElementById('modal-ves-motka').textContent = product[5] || 'Не найдено';
+                    document.getElementById('modal-dlina-motka').textContent = product[6] || 'Не найдено';
+                    document.getElementById('modal-ves-upakovki').textContent = product[7] || 'Не найдено';
+                    document.getElementById('modal-url').textContent = product[9] || 'Не найдено';
+                    document.getElementById('modal-url').href = product[9] || '#';
+                    document.getElementById('modal-last-updated').textContent = product[10] || 'Не найдено';
+
+                    const image = product[8];
+                    const modalImage = document.getElementById('modal-image');
+                    if (image && image.length > 0) {
+                        modalImage.src = "{{ url_for('static', filename='') }}" + image.replace(/^static\//, '').replace(/\\/g, '/');
+                        modalImage.style.display = 'block';
+                    } else {
+                        modalImage.style.display = 'none';
+                    }
+
+                    const variantContainer = document.getElementById('modal-variants');
+                    variantContainer.innerHTML = '';
+                    if (variants && variants.length > 0) {
+                        variants.forEach(variant => {
+                            const div = document.createElement('div');
+                            div.className = 'variant ' + (variant[4] ? 'available' : 'unavailable');
+                            const imagePath = variant[5];
+                            if (imagePath && imagePath.length > 0) {
+                                const imgSrc = "{{ url_for('static', filename='') }}" + imagePath.replace(/^static\//, '').replace(/\\/g, '/');
+                                div.innerHTML += `
+                                    <img src="${imgSrc}" 
+                                         alt="${variant[3] || 'Variant'}" 
+                                         class="variant-image" 
+                                         data-fullsize="${imgSrc}"
+                                         loading="lazy">
+                                `;
+                            } else {
+                                div.innerHTML += `<div class="no-image variant">No Image</div>`;
+                            }
+                            div.innerHTML += `<p><strong>Variant:</strong> ${variant[3] || 'Не найдено'}</p>`;
+                            div.innerHTML += `<p><strong>Article:</strong> ${variant[2] || 'Не найдено'}</p>`;
+                            div.innerHTML += `<p><strong>Available:</strong> ${variant[4] ? 'Yes' : 'No'}</p>`;
+                            variantContainer.appendChild(div);
+                        });
+                    } else {
+                        variantContainer.innerHTML = '<p>No variants available.</p>';
+                    }
+
+                    document.querySelectorAll('.variant-image').forEach(img => {
+                        img.addEventListener('click', () => {
+                            const zoomModal = document.getElementById('zoom-modal');
+                            const zoomImage = document.getElementById('zoom-image');
+                            zoomImage.src = img.dataset.fullsize;
+                            zoomModal.style.display = 'flex';
+                        });
+                    });
+
+                    document.getElementById('product-modal').style.display = 'flex';
+                } catch (error) {
+                    console.error('Error opening modal:', error);
+                    alert('Error: Unable to open product details.');
+                }
+            });
+        });
+
+        document.querySelector('#product-modal .close').addEventListener('click', () => {
+            document.getElementById('product-modal').style.display = 'none';
+        });
+
+        document.getElementById('product-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('product-modal')) {
+                document.getElementById('product-modal').style.display = 'none';
+            }
+        });
+
+        document.querySelector('#zoom-modal .close').addEventListener('click', () => {
+            document.getElementById('zoom-modal').style.display = 'none';
+        });
+
+        document.getElementById('zoom-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('zoom-modal')) {
+                document.getElementById('zoom-modal').style.display = 'none';
+            }
+        });
+
+        function filterCategory() {
+            const select = document.getElementById('category-filter');
+            const category = select.value;
+            window.location.href = "{{ url_for('browse') }}?category=" + encodeURIComponent(category);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parsing Results</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Parsing Results</h1>
+
+      <!-- Navigation Links -->
+      <div class="button-group">
+        <a href="{{ url_for('index') }}" class="btn">Back to Parser</a>
+        <a href="{{ url_for('browse') }}" class="btn">Browse Products</a>
+      </div>
+
+      <!-- Parsing Status -->
+      {% if parsing_status %}
+      <div
+        class="parsing-message {{ 'parsing-in-progress' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'parsing-error' if parsing_status == 'error' or parsing_status == 'canceled' else 'parsing-success' }}"
+      >
+        <span
+          class="loader"
+          style="display: {{ 'block' if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' else 'none' }};"
+        ></span>
+        <p>
+          {% if parsing_status == 'in_progress' %}
+            Parsing in progress...
+          {% elif parsing_status == 'awaiting_confirmation' %}
+            Awaiting confirmation for large parse. <a href="{{ url_for('confirm_parse') }}">Confirm or Cancel</a>
+          {% elif parsing_status == 'error' %}
+            Parsing failed. Check logs below.
+          {% elif parsing_status == 'canceled' %}
+            Parsing was canceled.
+          {% else %}
+            Parsing completed successfully.
+          {% endif %}
+        </p>
+        {% if parsing_status == 'in_progress' or parsing_status == 'awaiting_confirmation' %}
+        <form action="{{ url_for('cancel_parse') }}" method="POST">
+          <button type="submit" class="btn">Cancel Parsing</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Category Filter -->
+      <div class="form-group">
+        <label for="category">Filter by Category:</label>
+        <select
+          id="category"
+          onchange="window.location.href='{{ url_for('results') }}?category=' + this.value;"
+        >
+          <option value="all" {% if not selected_category %}selected{% endif %}>
+            All Categories
+          </option>
+          {% for category in categories %}
+          <option
+            value="{{ category }}"
+            {% if selected_category == category %}selected{% endif %}
+          >
+            {{ category }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Export Buttons -->
+      <div class="export-buttons">
+        <a
+          href="{{ url_for('results', category=selected_category, export='csv', table='products') }}"
+          class="btn"
+          >Export Products to CSV</a
+        >
+        <a
+          href="{{ url_for('results', category=selected_category, export='xlsx', table='products') }}"
+          class="btn"
+          >Export Products to XLSX</a
+        >
+        <a
+          href="{{ url_for('results', category=selected_category, export='csv', table='variants') }}"
+          class="btn"
+          >Export Variants to CSV</a
+        >
+        <a
+          href="{{ url_for('results', category=selected_category, export='xlsx', table='variants') }}"
+          class="btn"
+          >Export Variants to XLSX</a
+        >
+      </div>
+
+      <!-- Logs -->
+      {% if logs %}
+      <div class="logs">
+        <h2>Parsing Logs</h2>
+        {% for log in logs %}
+        <p>{{ log }}</p>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Products Table -->
+      {% if products %}
+      <h2>Products ({{ products|length }})</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              {% for col in product_columns %}
+              <th>{{ col }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in products %}
+            <tr>
+              {% for value in product %}
+              <td>
+                {% if product_columns[loop.index0] == 'image_path' and value %}
+                <img
+                  src="{{ url_for('static', filename=value) }}"
+                  alt="Product Image"
+                  style="max-width: 100px;"
+                />
+                {% elif product_columns[loop.index0] == 'url' and value %}
+                <a href="{{ value }}" target="_blank">{{ value }}</a>
+                {% else %}
+                {{ value }}
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p>No products found.</p>
+      {% endif %}
+
+      <!-- Variants Table -->
+      {% if variants %}
+      <h2>Variants ({{ variants|length }})</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              {% for col in variant_columns %}
+              <th>{{ col }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for variant in variants %}
+            <tr>
+              {% for value in variant %}
+              <td>
+                {% if variant_columns[loop.index0] == 'image_path' and value %}
+                <img
+                  src="{{ url_for('static', filename=value) }}"
+                  alt="Variant Image"
+                  style="max-width: 100px;"
+                />
+                {% elif variant_columns[loop.index0] == 'image_url' and value %}
+                <a href="{{ value }}" target="_blank">{{ value }}</a>
+                {% elif variant_columns[loop.index0] == 'is_available' %}
+                {{ 'Yes' if value else 'No' }}
+                {% else %}
+                {{ value }}
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p>No variants found.</p>
+      {% endif %}
+    </div>
+  </body>
+</html>
