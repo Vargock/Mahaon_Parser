@@ -2,11 +2,8 @@
 venv/
 
 # Ignore log files
-*.log
-*.db
-logs/
-/logs
-/images
+
+images/
 
 # Ignore Python cache
 __pycache__/
