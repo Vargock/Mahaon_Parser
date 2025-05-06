@@ -30,8 +30,11 @@ def get_logger(session_id=None):
     Returns:
         logger (logging.Logger): The configured logger instance.
     """
+    # Create timestamp for easier sorting, set up log file path
+    timestamp = datetime.datetime.now().strftime("%H.%M.%S")
+
     # Use session_id as logger name, or 'general' if None
-    logger_name = session_id if session_id is not None else "general"
+    logger_name = session_id if session_id is not None else timestamp
     logger = logging.getLogger(logger_name)
 
     # Prevent double logging if logger is reused
@@ -39,18 +42,13 @@ def get_logger(session_id=None):
         # Ensure the logs directory exists, create if doesn't
         os.makedirs("logs", exist_ok=True)
 
-        # Create timestamp for easier sorting, set up log file path
-        if logger_name != "general":
-            # Create daily_folder (e.g., logs/2025-05-06)
-            log_folder = datetime.datetime.now().strftime("%Y-%m-%d")
-            daily_dir = os.path.join("logs", log_folder)
-            os.makedirs(daily_dir, exist_ok=True)
+        # Create daily_folder (e.g., logs/2025-05-06)
+        log_folder = datetime.datetime.now().strftime("%Y-%m-%d")
+        daily_dir = os.path.join("logs", log_folder)
+        os.makedirs(daily_dir, exist_ok=True)
 
-            # Get sequence number from counter file
-            timestamp = datetime.datetime.now().strftime("%H.%M.%S")
-            log_filename = os.path.join(daily_dir, f"[{timestamp}]__{logger_name}.log")
-        else:
-            log_filename = f"logs/general.log"
+        # Get sequence number from counter file
+        log_filename = os.path.join(daily_dir, f"[{timestamp}]__{logger_name}.log")
 
         # Create a file handler to write logs to a file
         handler = logging.FileHandler(
@@ -160,3 +158,5 @@ def log_message(session_id: str, message: str, level: str = "info"):
     log_method = getattr(logger, level.lower(), logger.info)
 
     log_method(full_message)  # Log the full message at the specified log level
+
+    print(full_message)

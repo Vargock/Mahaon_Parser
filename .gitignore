@@ -2,6 +2,8 @@
 venv/
 
 # Ignore log files
+logs/
+*.db
 
 images/
 

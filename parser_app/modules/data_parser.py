@@ -7,7 +7,7 @@ or all categories, ensuring data is structured and saved to the database.
 """
 
 # Standard library imports
-from typing import Dict, List, Optional, Union
+from typing import Optional
 
 # Local imports
 from .logger import log_message
@@ -22,7 +22,7 @@ def parse_catalog(
     max_products: Optional[int] = None,
     session_id: Optional[str] = None,
     url: Optional[str] = None,
-    cancel_flags: Optional[Dict[str, bool]] = None,
+    cancel_flags: Optional[dict[str, bool]] = None,
     static_folder: Optional[str] = None,
 ) -> None:
     """Parse product data from a URL, category, or all categories.
@@ -48,8 +48,12 @@ def parse_catalog(
     """
     log_message(
         session_id,
-        f"parse_catalog: Starting parsing: URL={url}, Category={category}, "
-        f"Catalog={catalog_url}, Max Pages={max_pages}, Max Products={max_products}",
+        f"parse_catalog() | Starting parsing: "
+        f"{'URL: ' + url if url else ''} "
+        f"{'Category: ' + category if category else ''}, "
+        f"Catalog = {catalog_url}, "
+        f"{'Max Pages: ' + str(max_pages) if max_pages else ''}, "
+        f"{'Max Products: ' + str(max_products) if max_products else ''}",
         level="debug",
     )
     update_session_status(session_id, "in_progress", progress="collecting_urls")
@@ -65,13 +69,13 @@ def parse_catalog(
             ):
                 log_message(
                     session_id,
-                    f"parse_catalog: Successfully saved product: {product.title}",
+                    f"parse_catalog() | Successfully saved product: {product.title}",
                     level="info",
                 )
             else:
                 log_message(
                     session_id,
-                    f"parse_catalog: Error processing product: {url}",
+                    f"parse_catalog() | Error processing product: {url}",
                     level="error",
                 )
         elif url and "/collection/" in url:
@@ -86,7 +90,7 @@ def parse_catalog(
             )
             log_message(
                 session_id,
-                f"parse_catalog: Found {len(product_urls)} product URLs in category",
+                f"parse_catalog() | Found {len(product_urls)} product URLs in category",
                 level="debug",
             )
             if len(product_urls) > 5:
@@ -99,7 +103,7 @@ def parse_catalog(
                 )
                 log_message(
                     session_id,
-                    f"parse_catalog: Found {len(product_urls)} products, awaiting confirmation",
+                    f"parse_catalog() | Found {len(product_urls)} products, awaiting confirmation",
                     level="warning",
                 )
                 return
@@ -117,7 +121,7 @@ def parse_catalog(
             )
             log_message(
                 session_id,
-                f"parse_catalog: Found {len(product_urls)} product URLs in catalog",
+                f"parse_catalog() | Found {len(product_urls)} product URLs in catalog",
                 level="info",
             )
             if len(product_urls) > 5:
@@ -130,7 +134,7 @@ def parse_catalog(
                 )
                 log_message(
                     session_id,
-                    f"parse_catalog: Found {len(product_urls)} products, awaiting confirmation",
+                    f"parse_catalog() | Found {len(product_urls)} products, awaiting confirmation",
                     level="warning",
                 )
                 return
@@ -142,7 +146,7 @@ def parse_catalog(
             categories = fetch_categories()
             log_message(
                 session_id,
-                f"parse_catalog: Found {len(categories)} categories to parse",
+                f"parse_catalog() | Found {len(categories)} categories to parse",
                 level="info",
             )
             total_products = 0
@@ -151,14 +155,14 @@ def parse_catalog(
                 if max_products and total_products >= max_products:
                     log_message(
                         session_id,
-                        f"parse_catalog: Reached product limit ({max_products})",
+                        f"parse_catalog() | Reached product limit ({max_products})",
                         level="debug",
                     )
                     break
                 if cancel_flags.get(session_id, False):
                     log_message(
                         session_id,
-                        "parse_catalog: Parsing canceled, stopping category parsing",
+                        "parse_catalog() | Parsing canceled, stopping category parsing",
                         level="warning",
                     )
                     break
@@ -182,7 +186,7 @@ def parse_catalog(
                 )
                 log_message(
                     session_id,
-                    f"parse_catalog: Found {total_products} products, awaiting confirmation",
+                    f"parse_catalog() | Found {total_products} products, awaiting confirmation",
                     level="warning",
                 )
                 return
@@ -192,7 +196,7 @@ def parse_catalog(
     except Exception as e:
         log_message(
             session_id,
-            f"parse_catalog: Error during parsing: {e}",
+            f"parse_catalog() | Error during parsing: {e}",
             level="error",
         )
         update_session_status(session_id, "error")
@@ -200,10 +204,10 @@ def parse_catalog(
 
 
 def parse_product_urls(
-    product_urls: List[Union[str, tuple]],
+    product_urls: list[str | tuple],
     category: Optional[str],
     session_id: Optional[str],
-    cancel_flags: Optional[Dict[str, bool]],
+    cancel_flags: Optional[dict[str, bool]],
     static_folder: Optional[str],
 ) -> None:
     """Process a list of product URLs and save parsed data to the database.
@@ -225,20 +229,22 @@ def parse_product_urls(
     """
     log_message(
         session_id,
-        f"parse_product_urls: Processing {len(product_urls)} product URLs",
+        f"parse_product_urls() | Processing {len(product_urls)} product URLs",
         level="debug",
     )
-    for item in product_urls:
+    for item_url in product_urls:
         if cancel_flags.get(session_id, False):
             log_message(
                 session_id,
-                "parse_product_urls: Parsing canceled, stopping product processing",
+                "parse_product_urls() | Parsing canceled, stopping product processing",
                 level="warning",
             )
             break
-        # Extract URL and category from item (tuple or string)
-        url = item[0] if isinstance(item, tuple) else item
-        cat = item[1] if isinstance(item, tuple) else category
+
+        # Extract URL and category from item_url (tuple or string)
+        url = item_url[0] if isinstance(item_url, tuple) else item_url
+        cat = item_url[1] if isinstance(item_url, tuple) else category
+
         try:
             product = fetch_product_page(
                 url, cat, session_id, cancel_flags, static_folder
@@ -248,18 +254,18 @@ def parse_product_urls(
             ):
                 log_message(
                     session_id,
-                    f"parse_product_urls: Successfully saved: {product.to_dict()}",
+                    f"parse_product_urls() | Successfully saved: {product.to_dict()}",
                     level="info",
                 )
             else:
                 log_message(
                     session_id,
-                    f"parse_product_urls: Error processing product: {url}",
+                    f"parse_product_urls() | Error processing product: {url}",
                     level="error",
                 )
         except Exception as e:
             log_message(
                 session_id,
-                f"parse_product_urls: Error processing product {url}: {e}",
+                f"parse_product_urls() | Error processing product {url}: {e}",
                 level="error",
             )

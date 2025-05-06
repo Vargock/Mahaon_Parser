@@ -17,7 +17,9 @@ def download_image(
     existing_path = normalize_image_path(existing_path)
     if existing_path and os.path.exists(os.path.join(static_folder, existing_path)):
         log_message(
-            session_id, f"Изображение уже существует: {existing_path}", level="debug"
+            session_id,
+            f"Изображение уже существует: {existing_path} | download_image()",
+            level="debug",
         )
         return existing_path
 
@@ -41,12 +43,14 @@ def download_image(
         except Exception as e:
             log_message(
                 session_id,
-                f"❌ Ошибка загрузки изображения {image_url}: {e}",
+                f"❌ Ошибка загрузки изображения {image_url}: {e} | download_image()",
                 level="error",
             )
     else:
         log_message(
-            session_id, f"Изображение уже существует: {relative_path}", level="debug"
+            session_id,
+            f"Изображение уже существует: {relative_path} | download_image()",
+            level="debug",
         )
         return os.path.join("static", relative_path).replace(os.sep, "/")
     return None

@@ -13,10 +13,18 @@ from .data_extractor import extract_flexible_field, extract_main_image, extract_
 
 def fetch_product_page(url, category, session_id, cancel_flags, static_folder):
     if cancel_flags.get(session_id, False):
-        log_message(session_id, "⚠️ Парсинг отменен, пропуск продукта", level="warning")
+        log_message(
+            session_id,
+            "⚠️ Парсинг отменен, пропуск продукта | fetch_product_page()",
+            level="warning",
+        )
         return None
 
-    log_message(session_id, f"Начало парсинга продукта: {url}", level="info")
+    log_message(
+        session_id,
+        f"Начало парсинга продукта: {url} | fetch_product_page(), argument: url",
+        level="info",
+    )
 
     try:
         response = requests.get(url, timeout=10)
@@ -24,7 +32,7 @@ def fetch_product_page(url, category, session_id, cancel_flags, static_folder):
     except Exception as e:
         log_message(
             session_id,
-            f"❌ Ошибка при запросе страницы продукта {url}: {e}",
+            f"❌ Ошибка при запросе страницы продукта {url}: {e} | fetch_product_page(), argument: url",
             level="error",
         )
         log_message()
@@ -79,7 +87,9 @@ def fetch_product_page(url, category, session_id, cancel_flags, static_folder):
     )
 
     log_message(
-        session_id, f"Completed parsing product: {product.title}", level="debug"
+        session_id,
+        f"Completed parsing product: {product.title} | fetch_product_page()",
+        level="debug",
     )
     return product
 
@@ -93,7 +103,11 @@ def fetch_catalog_page(
     cancel_flags=None,
 ):
     if cancel_flags.get(session_id, False):
-        log_message(session_id, "⚠️ Парсинг отменен, пропуск каталога", level="warning")
+        log_message(
+            session_id,
+            "⚠️ Парсинг отменен, пропуск каталога | fetch_catalog_page()",
+            level="warning",
+        )
         return []
 
     product_urls = []
@@ -104,20 +118,22 @@ def fetch_catalog_page(
         if max_pages is not None and page_count >= max_pages:
             log_message(
                 session_id,
-                f"Достигнут лимит страниц ({max_pages}). Прекращение парсинга.",
+                f"Достигнут лимит страниц ({max_pages}). Прекращение парсинга. | fetch_catalog_page()",
                 level="info",
             )
             break
         if cancel_flags.get(session_id, False):
             log_message(
                 session_id,
-                "⚠️ Парсинг отменен, прекращение парсинга каталога",
+                "⚠️ Парсинг отменен, прекращение парсинга каталога | fetch_catalog_page()",
                 level="warning",
             )
             break
 
         log_message(
-            session_id, f"Парсинг страницы каталога: {catalog_url}", level="debug"
+            session_id,
+            f"Парсинг страницы каталога: {catalog_url} | fetch_catalog_page()",
+            level="debug",
         )
         try:
             response = requests.get(catalog_url, timeout=10)
@@ -125,7 +141,7 @@ def fetch_catalog_page(
         except Exception as e:
             log_message(
                 session_id,
-                f"❌ Ошибка при запросе каталога {catalog_url}: {e}",
+                f"❌ Ошибка при запросе каталога {catalog_url}: {e} | fetch_catalog_page()",
                 level="error",
             )
             break
@@ -136,27 +152,29 @@ def fetch_catalog_page(
         if not table:
             log_message(
                 session_id,
-                "❌ Ошибка: Таблица 'views-table cols-7' не найдена на странице.",
+                "❌ Ошибка: Таблица 'views-table cols-7' не найдена на странице. | fetch_catalog_page()",
                 level="error",
             )
             table = soup.find("table")
             if not table:
                 log_message(
                     session_id,
-                    "❌ Ошибка: Никакая таблица не найдена на странице.",
+                    "❌ Ошибка: Никакая таблица не найдена на странице. | fetch_catalog_page()",
                     level="error",
                 )
                 break
             else:
                 log_message(
-                    session_id, "Найдена альтернативная таблица.", level="error"
+                    session_id,
+                    "Найдена альтернативная таблица. | fetch_catalog_page()",
+                    level="error",
                 )
 
         tbody = table.find("tbody")
         if not tbody:
             log_message(
                 session_id,
-                "❌ Ошибка: Элемент <tbody> не найден в таблице.",
+                "❌ Ошибка: Элемент <tbody> не найден в таблице. | fetch_catalog_page()",
                 level="error",
             )
             break
@@ -165,12 +183,17 @@ def fetch_catalog_page(
         if not rows:
             log_message(
                 session_id,
-                "❌ Ошибка: Строки <tr> не найдены в <tbody>.",
+                "❌ Ошибка: Строки <tr> не найдены в <tbody>. | fetch_catalog_page()",
                 level="error",
             )
             break
 
-        log_message(session_id, f"Найдено {len(rows)} строк в таблице.", level="info")
+        log_message(
+            session_id,
+            f"Найдено {len(rows)} строк в таблице. | fetch_catalog_page()",
+            level="info",
+        )
+
         for row in rows:
             title_cell = row.find("td", class_="views-field views-field-title active")
             if title_cell:
@@ -178,13 +201,15 @@ def fetch_catalog_page(
                 if link and link["href"]:
                     product_url = urljoin(base_url, link["href"])
                     log_message(
-                        session_id, f"Найден продукт: {product_url}", level="info"
+                        session_id,
+                        f"Найден продукт: {product_url} | fetch_catalog_page()",
+                        level="info",
                     )
                     if product_url not in product_urls:
                         product_urls.append(product_url)
                         log_message(
                             session_id,
-                            f"Проверка длины {len(product_urls)}",
+                            f"Проверка длины {len(product_urls)} | fetch_catalog_page()",
                             level="debug",
                         )
                         if (
@@ -193,12 +218,12 @@ def fetch_catalog_page(
                         ):
                             log_message(
                                 session_id,
-                                f"Длина составляет {len(product_urls)}",
+                                f"Длина составляет {len(product_urls)} | fetch_catalog_page()",
                                 level="debug",
                             )
                             log_message(
                                 session_id,
-                                f"Достигнут лимит продуктов ({max_products}). Прекращение парсинга.",
+                                f"Достигнут лимит продуктов ({max_products}). Прекращение парсинга. | fetch_catalog_page()",
                                 level="info",
                             )
                             return product_urls
@@ -206,13 +231,13 @@ def fetch_catalog_page(
                 else:
                     log_message(
                         session_id,
-                        "⚠️ Предупреждение: Ссылка не найдена в ячейке заголовка.",
+                        "⚠️ Предупреждение: Ссылка не найдена в ячейке заголовка. | fetch_catalog_page()",
                         level="warning",
                     )
             else:
                 log_message(
                     session_id,
-                    "⚠️ Предупреждение: Ячейка заголовка не найдена в строке.",
+                    "⚠️ Предупреждение: Ячейка заголовка не найдена в строке. | fetch_catalog_page()",
                     level="warning",
                 )
 
@@ -225,27 +250,27 @@ def fetch_catalog_page(
                 catalog_url = urljoin(base_url, link["href"])
                 log_message(
                     session_id,
-                    f"Найдена следующая страница: {catalog_url}",
+                    f"Найдена следующая страница: {catalog_url} | fetch_catalog_page()",
                     level="info",
                 )
             else:
                 log_message(
                     session_id,
-                    "Следующая страница не найдена (нет ссылки в pager-next). Завершение пагинации.",
+                    "Следующая страница не найдена (нет ссылки в pager-next). Завершение пагинации. | fetch_catalog_page()",
                     level="info",
                 )
                 catalog_url = None
         else:
             log_message(
                 session_id,
-                "Следующая страница не найдена (нет pager-next). Завершение пагинации.",
+                "Следующая страница не найдена (нет pager-next). Завершение пагинации. | fetch_catalog_page()",
                 level="info",
             )
             catalog_url = None
 
     log_message(
         session_id,
-        f"Завершена fetch_catalog_page(), возвращает product_urls, длинной {len(product_urls)}",
+        f"Завершена fetch_catalog_page(), возвращает product_urls, длинной {len(product_urls)} | fetch_catalog_page()",
         level="debug",
     )
     return product_urls
@@ -253,6 +278,11 @@ def fetch_catalog_page(
 
 def fetch_categories():
     url = "https://nsk-mahaon.ru/"
+    log_message(
+        None,
+        f"Начало получения категорий с {url} | fetch_categories(), argument: urlZ",
+        level="info",
+    )
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -273,9 +303,22 @@ def fetch_categories():
                             categories.append(
                                 {"name": category_name, "url": category_url}
                             )
+                            log_message(
+                                None,
+                                f"Найдена категория: {category_name} ({category_url}) | fetch_categories(), argument: caregory_url",
+                                level="info",
+                            )
         if not categories:
-            log_message("Категории не найдены в блоке #block-block-4", level="warning")
+            log_message(
+                None,
+                f"Категории не найдены в блоке #block-block-4 | fetch_categories()",
+                level="warning",
+            )
         return categories
     except Exception as e:
-        log_message(f"Ошибка при получении категорий: {e}", level="error")
+        log_message(
+            None,
+            f"Ошибка при получении категорий: {e} | fetch_categories()",
+            level="error",
+        )
         return []

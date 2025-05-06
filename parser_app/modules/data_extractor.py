@@ -118,7 +118,7 @@ def extract_variants(
             variants.append(variant)
             log_message(
                 session_id,
-                f"Извлечен вариант: {variant_name} (Артикул: {article_number})",
+                f"Извлечен вариант: {variant_name} (Артикул: {article_number}) | extract_variants(...)",
                 level="info",
             )
     return variants
