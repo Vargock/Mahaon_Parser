@@ -13,12 +13,15 @@ from flask import (
 )
 import threading
 import uuid
-import csv
-import openpyxl
-from io import StringIO, BytesIO
 
 
 ## Python Modules
+from .modules.export import export_to_csv, export_to_xlsx
+from .modules.logger import log_message
+from .modules.utilities import (
+    get_db_connection,
+)
+
 from .modules.db_write import (
     create_db,
     cleanup_incomplete,
@@ -29,13 +32,13 @@ from .modules.db_read import (
     get_session_status,
     get_categories_from_db,
 )
-from parser_app.modules.parser_modules.core import parse_catalog, parse_product_urls
-from .modules.parser_modules.scraper import scrape_categories
-from .modules.logger import log_message
-from .modules.utilities import (
-    get_db_connection,
-)
 
+
+from parser_app.modules.data_parser import (
+    parse_catalog,
+    parse_product_urls,
+)
+from .modules.data_fetcher import fetch_categories
 
 create_db()
 app = Flask(__name__)
@@ -44,41 +47,10 @@ IMAGES_FOLDER = os.path.join(app.static_folder, "images")
 CANCEL_FLAGS = {}  # Tracks cancellation per session_id
 
 
-def export_to_csv(data, columns, filename):
-    output = StringIO()
-    writer = csv.writer(output)
-    writer.writerow(columns)
-    for row in data:
-        writer.writerow(row)
-    output.seek(0)
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment;filename={filename}"},
-    )
-
-
-def export_to_xlsx(data, columns, filename):
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Data"
-    ws.append(columns)
-    for row in data:
-        ws.append(row)
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return Response(
-        output.getvalue(),
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment;filename={filename}"},
-    )
-
-
 @app.route("/", methods=["GET"])
 def index():
     try:
-        categories = scrape_categories()
+        categories = fetch_categories()
         log_message(
             None,
             f"Rendering index.html with {len(categories)} categories",
@@ -144,7 +116,11 @@ def parse():
             )
 
         except Exception as e:
-            log_message(session_id, f"❌ Ошибка во время парсинга: {e}", level="error")
+            log_message(
+                session_id,
+                f"❌ Ошибка во время парсинга [app.py/run_parse()]: {e}",
+                level="error",
+            )
             update_session_status(session_id, "error")
             cleanup_incomplete(session_id)
         finally:
@@ -190,7 +166,11 @@ def confirm_parse():
                     category_name = cursor.fetchone()[0]
                     conn.close()
                     parse_product_urls(
-                        product_urls, category_name, parse_session_id, CANCEL_FLAGS
+                        product_urls,
+                        category_name,
+                        parse_session_id,
+                        CANCEL_FLAGS,
+                        app.static_folder,
                     )
                     if not CANCEL_FLAGS.get(parse_session_id, False):
                         update_session_status(parse_session_id, "complete")
@@ -418,11 +398,12 @@ def results():
     )
 
 
-@app.route("/logs")
-def get_latest_logs():
+@app.route("/logs-info")
+def logs_info():
     parse_session_id = session.get("parse_session_id")
     logs = get_logs(parse_session_id) if parse_session_id else []
-    return jsonify(logs)
+    log_count = len(logs)
+    return jsonify({"log_count": log_count, "logs": logs})
 
 
 @app.route("/parsing-status")
@@ -516,61 +497,3 @@ def browse():
         selected_category=selected_category,
         parsing_status=status,
     )
-
-
-@app.route("/export_csv")
-def export_csv():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM products WHERE is_complete = 1")
-    products = cursor.fetchall()
-    cursor.execute("PRAGMA table_info(products)")
-    product_columns = [col[1] for col in cursor.fetchall()]
-    conn.close()
-    return export_to_csv(products, product_columns, "products.csv")
-
-
-@app.route("/export_xlsx")
-def export_xlsx():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM products WHERE is_complete = 1")
-    products = cursor.fetchall()
-
-    cursor.execute("PRAGMA table_info(products)")
-    product_columns = [col[1] for col in cursor.fetchall()]
-
-    cursor.execute("SELECT * FROM variants WHERE is_complete = 1")
-    variants = cursor.fetchall()
-
-    cursor.execute("PRAGMA table_info(variants)")
-    variant_columns = [col[1] for col in cursor.fetchall()]
-
-    conn.close()
-
-    wb = openpyxl.Workbook()
-    ws_products = wb.active
-    ws_products.title = "Products"
-    ws_products.append(product_columns)
-    for row in products:
-        ws_products.append(row)
-
-    ws_variants = wb.create_sheet("Variants")
-    ws_variants.append(variant_columns)
-    for row in variants:
-        ws_variants.append(row)
-
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return Response(
-        output.getvalue(),
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment;filename=products.xlsx"},
-    )
-
-
-if __name__ == "__main__":
-    create_db()
-    app.run(debug=True)

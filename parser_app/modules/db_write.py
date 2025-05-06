@@ -216,7 +216,9 @@ def save_to_db(
     # 1. Check if the operation was canceled before proceeding
     if cancel_flags.get(session_id, False):
         log_message(
-            session_id, "⚠️ Парсинг отменен, данные не сохраняются", level="warning"
+            session_id,
+            "⚠️ Парсинг отменен, данные не сохраняются | Step #1 | save_to_db(...) found cancel_flag",
+            level="warning",
         )
         return False
 
@@ -233,7 +235,7 @@ def save_to_db(
     if not product_data["image_path"]:
         log_message(
             session_id,
-            f"❌ Недействительный путь изображения: {product_data['image_path']}",
+            f"❌ Недействительный путь изображения: {product_data['image_path']} | Step #4 | save_to_db(...) could not validate product_data['image_path']",
             level="error",
         )
         product_data["image_path"] = None
@@ -242,7 +244,7 @@ def save_to_db(
     if not product_data["title"] or product_data["title"] == "Не найдено":
         log_message(
             session_id,
-            f"❌ Неверные данные продукта: {product_data['url']}",
+            f"❌ Неверные данные продукта: {product_data['url']}  | Step #5 | save_to_db(...) could not validate product_data['title']",
             level="error",
         )
         conn.close()
@@ -275,12 +277,16 @@ def save_to_db(
         )
 
         conn.commit()
-        log_message(session_id, f"✅ Успешно сохранено: {product_data}", level="info")
+        log_message(
+            session_id,
+            f"✅ Успешно сохранено: {product_data} | save_to_db(...) [product_data]",
+            level="info",
+        )
 
     except sqlite3.Error as e:
         log_message(
             session_id,
-            f"❌ Ошибка при сохранении продукта {product_data['url']}: {e}",
+            f"❌ Ошибка при сохранении продукта {product_data['url']}: {e} | Step #6 | save_to_db(...) could not save product_data into products.db",
             level="error",
         )
         conn.rollback()
@@ -293,7 +299,7 @@ def save_to_db(
     if result is None:
         log_message(
             session_id,
-            f"❌ Ошибка: Продукт с URL {product.url} не был сохранен в базе данных.",
+            f"❌ Ошибка: Продукт с URL {product.url} не был сохранен в базе данных | Step #7 | save_to_db(...) could not retrieve product_url from db",
             level="error",
         )
         conn.close()
@@ -307,7 +313,7 @@ def save_to_db(
         if cancel_flags.get(session_id, False):
             log_message(
                 session_id,
-                "⚠️ Парсинг отменен, прекращение сохранения вариантов",
+                "⚠️ Парсинг отменен, прекращение сохранения вариантов | Step #8.1 | save_to_db(...) found cancel_flag,",
                 level="warning",
             )
             break
@@ -322,7 +328,7 @@ def save_to_db(
         ):
             log_message(
                 session_id,
-                f"❌ Недействительный путь изображения варианта {variant_data['variant_name']}[{variant_data['article_number']}]: {variant_data['image_path']}",
+                f"❌ Недействительный путь изображения варианта {variant_data['variant_name']}[{variant_data['article_number']}]: {variant_data['image_path']} | Step #8.2 | save_to_db(...) could not validate variand_data['image_path']",
                 level="error",
             )
             variant_data["image_path"] = None
@@ -350,7 +356,7 @@ def save_to_db(
         except sqlite3.Error as e:
             log_message(
                 session_id,
-                f"❌ Ошибка при сохранении варианта {variant_data["variant_name"], variant_data["article_number"]} для продукта {product_id}: {e}",
+                f"❌ Ошибка при сохранении варианта {variant_data["variant_name"], variant_data["article_number"]} для продукта {product_id}: {e} | Step #8.3 | save_to_db(...) failed to save variand_data",
                 level="error",
             )
             conn.rollback()
@@ -386,7 +392,9 @@ def cleanup_incomplete(session_id):
     # Log cleanup completion
     deleted_count = cursor.rowcount
     log_message(
-        session_id, f"🧹 Очищено {deleted_count} незавершенных продуктов", level="info"
+        session_id,
+        f"🧹 Очищено {deleted_count} незавершенных продуктов | cleanup_incomplete(...)",
+        level="info",
     )
 
 

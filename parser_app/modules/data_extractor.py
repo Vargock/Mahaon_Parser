@@ -1,9 +1,9 @@
 from datetime import datetime
 
 # Import modules
-from ..classes import Variant
-from ..logger import log_message
-from .image_handler import download_image
+from .classes import Variant
+from .logger import log_message
+from .data_image_handler import download_image
 
 
 def extract_flexible_field(label_text, soup):
@@ -59,7 +59,7 @@ def extract_variants(
             if cancel_flags.get(session_id, False):
                 log_message(
                     session_id,
-                    "⚠️ Парсинг отменен, прекращение извлечения вариантов",
+                    "⚠️ Парсинг отменен, прекращение извлечения вариантов | extract_variants(...)",
                     level="warning",
                 )
                 break

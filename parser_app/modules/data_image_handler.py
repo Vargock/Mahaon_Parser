@@ -2,8 +2,8 @@ import os
 import requests
 
 # Import modules
-from ..logger import log_message
-from ..utilities import normalize_image_path, sanitize_filename
+from .logger import log_message
+from .utilities import normalize_image_path, sanitize_filename
 
 
 def download_image(
@@ -24,7 +24,7 @@ def download_image(
     relative_path = os.path.join(
         folder, f"{sanitize_filename(filename_prefix)}.jpg"
     ).replace(os.sep, "/")
-    filepath = os.path.join(static_folder, "static", relative_path)
+    filepath = os.path.join(static_folder, relative_path)
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
 

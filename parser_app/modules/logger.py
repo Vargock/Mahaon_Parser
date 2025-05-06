@@ -30,16 +30,33 @@ def get_logger(session_id=None):
     Returns:
         logger (logging.Logger): The configured logger instance.
     """
+    # Use session_id as logger name, or 'general' if None
     logger_name = session_id if session_id is not None else "general"
     logger = logging.getLogger(logger_name)
 
     # Prevent double logging if logger is reused
     if not logger.handlers:
-        # Ensure the logs directory exists
+        # Ensure the logs directory exists, create if doesn't
         os.makedirs("logs", exist_ok=True)
 
+        # Create timestamp for easier sorting, set up log file path
+        if logger_name != "general":
+            # Create daily_folder (e.g., logs/2025-05-06)
+            log_folder = datetime.datetime.now().strftime("%Y-%m-%d")
+            daily_dir = os.path.join("logs", log_folder)
+            os.makedirs(daily_dir, exist_ok=True)
+
+            # Get sequence number from counter file
+            timestamp = datetime.datetime.now().strftime("%H.%M.%S")
+            log_filename = os.path.join(daily_dir, f"[{timestamp}]__{logger_name}.log")
+        else:
+            log_filename = f"logs/general.log"
+
         # Create a file handler to write logs to a file
-        handler = logging.FileHandler(f"logs/{logger_name}.log", encoding="utf-8")
+        handler = logging.FileHandler(
+            log_filename,
+            encoding="utf-8",
+        )
 
         # Define the log message format
         formatter = logging.Formatter(

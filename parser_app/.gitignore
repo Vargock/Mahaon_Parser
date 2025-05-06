@@ -1,0 +1,25 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python virtual environments
+venv/
+.env/
+
+# Secrets
+*.env
+
+# IDE files
+.vscode/
+.idea/
+
+# Node modules (if using JS too)
+node_modules/

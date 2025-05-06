@@ -3,15 +3,15 @@ from datetime import datetime
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
-from ..classes import Product
-from ..logger import log_message
-from .image_handler import download_image
-from .extractor import extract_flexible_field, extract_main_image, extract_variants
-from ..db_read import get_existing_image_paths
-from ..utilities import get_image_folder
+from .classes import Product
+from .logger import log_message
+from .utilities import get_image_folder
+from .db_read import get_existing_image_paths
+from .data_image_handler import download_image
+from .data_extractor import extract_flexible_field, extract_main_image, extract_variants
 
 
-def scrape_product_page(url, category, session_id, cancel_flags, static_folder):
+def fetch_product_page(url, category, session_id, cancel_flags, static_folder):
     if cancel_flags.get(session_id, False):
         log_message(session_id, "⚠️ Парсинг отменен, пропуск продукта", level="warning")
         return None
@@ -84,7 +84,7 @@ def scrape_product_page(url, category, session_id, cancel_flags, static_folder):
     return product
 
 
-def scrape_catalog_page(
+def fetch_catalog_page(
     catalog_url,
     category,
     max_pages=None,
@@ -183,7 +183,9 @@ def scrape_catalog_page(
                     if product_url not in product_urls:
                         product_urls.append(product_url)
                         log_message(
-                            session_id, f"Проверка длины {product_urls}", level="debug"
+                            session_id,
+                            f"Проверка длины {len(product_urls)}",
+                            level="debug",
                         )
                         if (
                             max_products is not None
@@ -200,12 +202,7 @@ def scrape_catalog_page(
                                 level="info",
                             )
                             return product_urls
-                        else:
-                            log_message(
-                                session_id,
-                                f"Проблема с product_urls, function scrape_catalog_page {product_urls}",
-                                level="debug",
-                            )
+
                 else:
                     log_message(
                         session_id,
@@ -246,10 +243,15 @@ def scrape_catalog_page(
             )
             catalog_url = None
 
+    log_message(
+        session_id,
+        f"Завершена fetch_catalog_page(), возвращает product_urls, длинной {len(product_urls)}",
+        level="debug",
+    )
     return product_urls
 
 
-def scrape_categories():
+def fetch_categories():
     url = "https://nsk-mahaon.ru/"
     try:
         response = requests.get(url, timeout=10)

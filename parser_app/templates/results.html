@@ -12,6 +12,7 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
     />
+    <link rel="shortcut icon" href="{{ url_for('favicon') }}" type="image/x-icon">
   </head>
   <body>
     <div class="container">
@@ -189,54 +190,71 @@
     </div>
 
   <script>
+    let lastLogCount = 0;
+    let pollingInterval = null;
+
     function updateLogs() {
-      fetch("/logs")
+      fetch("/logs-info")
         .then((res) => res.json())
-        .then((logs) => {
+        .then((data) => {
+          const logs = data.logs;
           const logContainer = document.getElementById("log-output");
-          logContainer.innerHTML = logs.map(log => `<p>${log}</p>`).join("");
+
+          if (logs.length > lastLogCount) {
+            lastLogCount = logs.length;
+            logContainer.innerHTML = logs.map(log => `<p>${log}</p>`).join("");
+            updateParsingStatus(); // Check status if logs changed
+          }
         });
     }
 
     function updateParsingStatus() {
-        fetch("/parsing-status")
-          .then((res) => res.json())
-          .then((data) => {
-            const status = data.status;
-            const container = document.getElementById("parsing-status-message");
-            const text = document.getElementById("parsing-status-text");
-            const loader = document.getElementById("parsing-loader");
+      fetch("/parsing-status")
+        .then((res) => res.json())
+        .then((data) => {
+          const status = data.status;
+          const container = document.getElementById("parsing-status-message");
+          const text = document.getElementById("parsing-status-text");
+          const loader = document.getElementById("parsing-loader");
 
-            container.className = "parsing-message";
-            if (status === "in_progress" || status === "awaiting_confirmation") {
-              container.classList.add("parsing-in-progress");
-              loader.style.display = "block";
-            } else if (status === "error" || status === "canceled") {
-              container.classList.add("parsing-error");
-              loader.style.display = "none";
-            } else {
-              container.classList.add("parsing-success");
-              loader.style.display = "none";
-            }
+          container.className = "parsing-message";
+          if (status === "in_progress" || status === "awaiting_confirmation") {
+            container.classList.add("parsing-in-progress");
+            loader.style.display = "block";
+          } else if (status === "error" || status === "canceled") {
+            container.classList.add("parsing-error");
+            loader.style.display = "none";
+          } else {
+            container.classList.add("parsing-success");
+            loader.style.display = "none";
+          }
 
-            // Update text
-            if (status === "in_progress") {
-              text.innerHTML = "Parsing in progress...";
-            } else if (status === "awaiting_confirmation") {
-              text.innerHTML =
-                'Awaiting confirmation for large parse. <a href="{{ url_for("confirm_parse") }}">Confirm or Cancel</a>';
-            } else if (status === "error") {
-              text.innerText = "Parsing failed. Check logs below.";
-            } else if (status === "canceled") {
-              text.innerText = "Parsing was canceled.";
-            } else {
-              text.innerText = "Parsing completed successfully.";
-            }
-          });
-      }
+          // Update status message
+          if (status === "in_progress") {
+            text.innerHTML = "Parsing in progress...";
+          } else if (status === "awaiting_confirmation") {
+            text.innerHTML =
+              'Awaiting confirmation for large parse. <a href="{{ url_for("confirm_parse") }}">Confirm or Cancel</a>';
+          } else if (status === "error") {
+            text.innerText = "Parsing failed. Check logs below.";
+          } else if (status === "canceled") {
+            text.innerText = "Parsing was canceled.";
+          } else {
+            text.innerText = "Parsing completed successfully.";
+          }
 
-    setInterval(updateParsingStatus, 1500);
-    setInterval(updateLogs, 1500);
+          // Stop polling if status is final
+          if (["completed", "error", "canceled"].includes(status)){
+            clearInterval(pollingInterval);
+            console.log("Polling stopped — parsing is finished.");
+          }
+        });
+    }
+
+    // Start polling every 1.5s
+    pollingInterval = setInterval(updateLogs, 500);
   </script>
+
+
   </body>
 </html>

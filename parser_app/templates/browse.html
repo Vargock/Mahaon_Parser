@@ -6,7 +6,7 @@
     <title>Browse Products</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="shortcut icon" href="{{ url_for('favicon') }}" type="image/x-icon">
 </head>
 <body>
     <div class="container">
@@ -29,7 +29,7 @@
                 {% if parsing_status == 'in_progress' %}
                     Parsing in progress...
                 {% elif parsing_status == 'awaiting_confirmation' %}
-                    Awaiting confirmation for large parse. <a href="{{ url_for('confirm_parse') }}">Confirm or Cancel</a>
+                    Awaiting confirmation for a large parse. <a href="{{ url_for('confirm_parse') }}">Confirm or Cancel</a>
                 {% elif parsing_status == 'error' %}
                     Parsing failed. Check logs in Results.
                 {% elif parsing_status == 'canceled' %}
