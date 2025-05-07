@@ -115,6 +115,7 @@ def parse():
                 session_id=session_id,
                 url=url or None,
                 cancel_flags=CANCEL_FLAGS,
+                static_folder=app.static_folder,
             )
 
         except Exception as e:

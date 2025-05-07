@@ -34,7 +34,7 @@ def get_logger(session_id=None):
     timestamp = datetime.datetime.now().strftime("%H.%M.%S")
 
     # Use session_id as logger name, or 'general' if None
-    logger_name = session_id if session_id is not None else timestamp
+    logger_name = session_id if session_id is not None else f"{timestamp}"
     logger = logging.getLogger(logger_name)
 
     # Prevent double logging if logger is reused
@@ -47,8 +47,11 @@ def get_logger(session_id=None):
         daily_dir = os.path.join("logs", log_folder)
         os.makedirs(daily_dir, exist_ok=True)
 
-        # Get sequence number from counter file
-        log_filename = os.path.join(daily_dir, f"[{timestamp}]__{logger_name}.log")
+        # Log file name based on session_id (or 'general')
+        if logger_name == timestamp:
+            log_filename = os.path.join(daily_dir, f"{logger_name}.log")
+        else:
+            log_filename = os.path.join(daily_dir, f"{timestamp}_{logger_name}.log")
 
         # Create a file handler to write logs to a file
         handler = logging.FileHandler(

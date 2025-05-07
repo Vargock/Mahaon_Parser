@@ -1,11 +1,14 @@
 import sqlite3
 from datetime import datetime
 import json
+import threading
 
 # Import modules
 from .utilities import normalize_image_path, get_db_connection
 from .classes import Product, Variant
 from .logger import log_message
+
+db_lock = threading.Lock()
 
 
 def create_db():
@@ -222,16 +225,10 @@ def save_to_db(
         )
         return False
 
-    # 2. Connect to the database
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
-
-    # 3. Convert product to dictionary and normalize image path
+    # 2. Validate inputs before database operations
     product_data = product.to_dict()
     product_data["image_path"] = normalize_image_path(product_data["image_path"])
 
-    # 4. Validate product image path (can be None)
     if not product_data["image_path"]:
         log_message(
             session_id,
@@ -240,132 +237,143 @@ def save_to_db(
         )
         product_data["image_path"] = None
 
-    # 5. Ensure the product has a valid title before saving
     if not product_data["title"] or product_data["title"] == "Не найдено":
         log_message(
             session_id,
             f"❌ Неверные данные продукта: {product_data['url']} | save_to_db() could not validate product_data['title']",
             level="error",
         )
-        conn.close()
         return False
 
-    # 6. Try to insert or update product in the database
-    try:
-        cursor.execute(
-            """
-            INSERT INTO products (
-                category, title, price, sostav, ves_motka, dlina_motka,
-                ves_upakovki, image_path, url, last_updated, is_complete
-            ) VALUES (
-                :category, :title, :price, :sostav, :ves_motka, :dlina_motka,
-                :ves_upakovki, :image_path, :url, :last_updated, 1
-            )
-            ON CONFLICT(url) DO UPDATE SET
-                category = excluded.category,
-                title = excluded.title,
-                price = excluded.price,
-                sostav = excluded.sostav,
-                ves_motka = excluded.ves_motka,
-                dlina_motka = excluded.dlina_motka,
-                ves_upakovki = excluded.ves_upakovki,
-                image_path = excluded.image_path,
-                last_updated = excluded.last_updated,
-                is_complete = 1;
-            """,
-            product_data,
-        )
-
-        conn.commit()
-        log_message(
-            session_id,
-            f"✅ Успешно сохранено: {product_data} | save_to_db()",
-            level="info",
-        )
-
-    except sqlite3.Error as e:
-        log_message(
-            session_id,
-            f"❌ Ошибка при сохранении продукта {product_data['url']}: {e} | save_to_db() could not save product_data into products.db",
-            level="error",
-        )
-        conn.rollback()
-        conn.close()
-        return False
-
-    # 7. Retrieve product_id for use in saving variants
-    cursor.execute("SELECT id FROM products WHERE url = ?", (product.url,))
-    result = cursor.fetchone()
-    if result is None:
-        log_message(
-            session_id,
-            f"❌ Ошибка: Продукт с URL {product.url} не был сохранен в базе данных | save_to_db() could not retrieve product_url from db",
-            level="error",
-        )
-        conn.close()
-        return False
-
-    product_id = result[0]
-
-    # 8. Save variants for the product
-    for variant in variants:
-        # Check if the operation was canceled inside the loop
-        if cancel_flags.get(session_id, False):
-            log_message(
-                session_id,
-                "⚠️ Парсинг отменен, прекращение сохранения вариантов | save_to_db() found cancel_flag,",
-                level="warning",
-            )
-            break
-
-        # Process each variant
-        variant_data = variant.to_dict()
-        variant_data["image_path"] = normalize_image_path(variant_data["image_path"])
-
-        # Validate variant image path
-        if variant_data["image_path"] and not variant_data["image_path"].startswith(
-            "static/images"
-        ):
-            log_message(
-                session_id,
-                f"❌ Недействительный путь изображения варианта {variant_data['variant_name']}|[{variant_data['article_number']}]: {variant_data['image_path']} | save_to_db() could not validate variand_data['image_path']",
-                level="error",
-            )
-            variant_data["image_path"] = None
-
-        # Try to insert or update variant in the database
+    # 3. Connect to the database and perform transaction
+    with db_lock:
+        conn = get_db_connection()
         try:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA foreign_keys = ON;")
+            cursor.execute("BEGIN TRANSACTION")  # Start transaction
+
+            # 4. Insert or update product
             cursor.execute(
                 """
-                INSERT INTO variants (
-                    product_id, article_number, variant_name, is_available,
-                    image_path, image_url, last_updated, is_complete
+                INSERT INTO products (
+                    category, title, price, sostav, ves_motka, dlina_motka,
+                    ves_upakovki, image_path, url, last_updated, is_complete
                 ) VALUES (
-                    :product_id, :article_number, :variant_name, :is_available,
-                    :image_path, :image_url, :last_updated, 1
+                    :category, :title, :price, :sostav, :ves_motka, :dlina_motka,
+                    :ves_upakovki, :image_path, :url, :last_updated, 1
                 )
-                ON CONFLICT(product_id, article_number, variant_name) DO UPDATE SET
-                    is_available = excluded.is_available,
+                ON CONFLICT(url) DO UPDATE SET
+                    category = excluded.category,
+                    title = excluded.title,
+                    price = excluded.price,
+                    sostav = excluded.sostav,
+                    ves_motka = excluded.ves_motka,
+                    dlina_motka = excluded.dlina_motka,
+                    ves_upakovki = excluded.ves_upakovki,
                     image_path = excluded.image_path,
-                    image_url = excluded.image_url,
                     last_updated = excluded.last_updated,
                     is_complete = 1;
                 """,
-                variant_data,
+                product_data,
             )
-        except sqlite3.Error as e:
+
+            # 5. Retrieve product_id
+            cursor.execute("SELECT id FROM products WHERE url = ?", (product.url,))
+            result = cursor.fetchone()
+            if result is None:
+                log_message(
+                    session_id,
+                    f"❌ Ошибка: Продукт с URL {product.url} не был сохранен в базе данных | save_to_db() could not retrieve product_url from db",
+                    level="error",
+                )
+                conn.rollback()
+                return False
+
+            product_id = result[0]
+            variant_data_list = []
+
+            # 6. Prepare and validate variants
+            for variant in variants:
+                # Check if the operation was canceled inside the loop
+                if cancel_flags.get(session_id, False):
+                    log_message(
+                        session_id,
+                        "⚠️ Парсинг отменен, прекращение сохранения вариантов | save_to_db() found cancel_flag,",
+                        level="warning",
+                    )
+                    conn.rollback()
+                    return False
+
+                # Process each variant
+                variant_data = variant.to_dict()
+                variant_data["product_id"] = product_id
+                variant_data["image_path"] = normalize_image_path(
+                    variant_data["image_path"]
+                )
+
+                # Validate variant image path
+                if variant_data["image_path"] and not variant_data[
+                    "image_path"
+                ].startswith("static/images"):
+                    log_message(
+                        session_id,
+                        f"❌ Недействительный путь изображения варианта {variant_data['variant_name']}|[{variant_data['article_number']}]: {variant_data['image_path']} | save_to_db() could not validate variand_data['image_path']",
+                        level="error",
+                    )
+                    variant_data["image_path"] = None
+
+                variant_data_list.append(variant_data)
+
+            # 7. Insert or update variants in bulk
+            if variant_data_list:
+                try:
+                    cursor.executemany(
+                        """
+                        INSERT INTO variants (
+                            product_id, article_number, variant_name, is_available,
+                            image_path, image_url, last_updated, is_complete
+                        ) VALUES (
+                            :product_id, :article_number, :variant_name, :is_available,
+                            :image_path, :image_url, :last_updated, 1
+                        )
+                        ON CONFLICT(product_id, article_number, variant_name) DO UPDATE SET
+                            is_available = excluded.is_available,
+                            image_path = excluded.image_path,
+                            image_url = excluded.image_url,
+                            last_updated = excluded.last_updated,
+                            is_complete = 1;
+                        """,
+                        variant_data_list,
+                    )
+                except sqlite3.Error as e:
+                    log_message(
+                        session_id,
+                        f"❌ Ошибка при сохранении варианта {variant_data["variant_name"], variant_data["article_number"]} для продукта {product_id}: {e} | save_to_db() failed to save variand_data",
+                        level="error",
+                    )
+                    conn.rollback()
+                    return False
+
+            # 8. Commit the transaction
+            conn.commit()
             log_message(
                 session_id,
-                f"❌ Ошибка при сохранении варианта {variant_data["variant_name"], variant_data["article_number"]} для продукта {product_id}: {e} | save_to_db() failed to save variand_data",
+                f"✅ Успешно сохранено: {product_data} с {len(variant_data_list)} вариантами | save_to_db()",
+                level="info",
+            )
+            return True
+
+        except sqlite3.Error as e:
+            conn.rollback()  # Rollback on error
+            log_message(
+                session_id,
+                f"Error saving product {product_data['url']}: {e}",
                 level="error",
             )
-            conn.rollback()
-            continue  # Move to the next variant if one fails
-
-    # Commit changes and close the connection
-    conn.commit()
-    conn.close()
-    return True
+            return False
+        finally:
+            conn.close()
 
 
 def cleanup_incomplete(session_id):
@@ -377,48 +385,53 @@ def cleanup_incomplete(session_id):
     """
 
     # Connect to the database
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
+    with db_lock:
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA foreign_keys = ON;")
 
-    # Delete products with is_complete = 0
-    # Due to the ON DELETE CASCADE in the foreign key, related variants are also deleted automatically.
-    cursor.execute("DELETE FROM products WHERE is_complete = 0")
+            # Delete products with is_complete = 0
+            # Due to the ON DELETE CASCADE in the foreign key, related variants are also deleted automatically.
+            cursor.execute("DELETE FROM products WHERE is_complete = 0")
 
-    # Commit changes and close the connection
-    conn.commit()
-    conn.close()
+            # Commit changes and close the connection
+            conn.commit()
 
-    # Log cleanup completion
-    deleted_count = cursor.rowcount
-    log_message(
-        session_id,
-        f"🧹 Очищено {deleted_count} незавершенных продуктов | cleanup_incomplete()",
-        level="info",
-    )
+            # Log cleanup completion
+            deleted_count = cursor.rowcount
+            log_message(
+                session_id,
+                f"🧹 Очищено {deleted_count} незавершенных продуктов | cleanup_incomplete()",
+                level="info",
+            )
+        finally:
+            conn.close()
 
 
 def update_session_status(
     session_id, status, product_urls=None, progress=None, category_name=None
 ):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        INSERT OR REPLACE INTO parse_sessions (session_id, status, created_at, updated_at, product_urls, progress, category_name)
-        VALUES (?, ?, COALESCE((SELECT created_at FROM parse_sessions WHERE session_id = ?), ?), ?, ?, ?, ?)
-        """,
-        (
-            session_id,
-            status,
-            session_id,
-            datetime.now().isoformat(" ", "minutes"),
-            datetime.now().isoformat(" ", "minutes"),
-            json.dumps(product_urls) if product_urls else None,
-            progress,
-            category_name,
-        ),
-    )
-    conn.commit()
-    conn.close()
+    with db_lock:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO parse_sessions (session_id, status, created_at, updated_at, product_urls, progress, category_name)
+                VALUES (?, ?, COALESCE((SELECT created_at FROM parse_sessions WHERE session_id = ?), ?), ?, ?, ?, ?)
+                """,
+                (
+                    session_id,
+                    status,
+                    session_id,
+                    datetime.now().isoformat(" ", "minutes"),
+                    datetime.now().isoformat(" ", "minutes"),
+                    json.dumps(product_urls) if product_urls else None,
+                    progress,
+                    category_name,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
